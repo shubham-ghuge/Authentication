@@ -1,8 +1,10 @@
 var express = require('express');
 var bcrypt = require('bcrypt');
 var salt = bcrypt.genSaltSync(8);
+var jwt = require('jsonwebtoken');
 const User = require('../models/users.models');
 const router = express.Router();
+require('dotenv').config();
 
 function accessDenial(req, res) {
   return res.status(401).json({ message: 'Bad Request' });
@@ -25,17 +27,21 @@ router.route('/register')
 router.route('/login')
   .get(accessDenial)
   .post(async (req, res) => {
+    const { email, password } = req.body;
     try {
-      const { email, password } = req.body;
-      const user = await User.findOne({ email})
-      if (!user) {
-        res.status(204).json({ success: false, message: 'User Not Found' })
+      const user = await User.findOne({ email })
+      if (user === null) {
+        return res.json({ success: false, message: 'User Not Found' })
+      } else {
+        const checkPassword = bcrypt.compareSync(password, user.password)
+        if (!checkPassword) {
+          return res.json({ success: false, message: 'Invalid Password' });
+        }
+
+        const token = jwt.sign({ userId: user._id }, process.env['secret_key'], { expiresIn: '24h' })
+
+        res.status(200).json({ success: true, message: "Login Successful", token })
       }
-      const checkPassword = bcrypt.compareSync(password, user.password)
-      if (!checkPassword) {
-        res.status(204).json({ success: false, message: 'Invalid Password' })
-      }
-      res.status(200).json({ success: true, message: "Login Successful" })
     }
     catch (error) {
       throw error;
